@@ -1,0 +1,121 @@
+    CÓDIGO PARA GENERAR BASES DE MAILING
+
+Correspondencia con el abecedario:
+#M = 13; Z= 26; AM= 39 ; AZ =52; BM =65; BZ =78; CM =91; CZ =104; DM =117; DZ = 130
+
+Se importa todo el directorio
+```{r}
+Directorio_URL <- "https://docs.google.com/spreadsheets/d/1MrWB_LUyCFI3fUj-p65rGrvszq-oI_TK7jv9Ng65dF8/edit?gid=1559650181#gid=1559650181" #Considerar que el link es el mismo
+Directorio_GdC <- read_sheet(Directorio_URL, sheet = "Directorio_GdC") #Considerar que la hoja se llame igual
+```
+Se quedan solo las filas que coinciden con la conferencia de interés
+```{r}
+Directorio_Limpio <- Directorio_GdC[,c(2,4,5,6,7,10,34:40,48:55,67)] #El 67 es variable. Corresponde al número de columna de interés
+Directorio_Limpio <- Directorio_Limpio[!is.na(Directorio_Limpio$`Incluyó en el PDP: CURSO - Integridad en la gestión pública`), ] #El nombre de la columna (luego del símbolo $) es variable. Corresponde al nombre de la columna de interés. no borrar los ` `
+Directorio_Limpio <- subset(Directorio_Limpio, `Incluyó en el PDP: CURSO - Integridad en la gestión pública` %in% c("SI", "SI, POR VALIDAR PDP")) #Considerar que solo se quedarán las filas con "SI" y "SI, POR VALIDAR PDP", excluyendo tanto a filas vacías, como filas con otros nombres. Actualizar (o agregar con comas) de ser necesario. Actualizar también el nombre de la columna de interés.
+Directorio_Limpio <- data.frame(lapply(Directorio_Limpio, as.character), stringsAsFactors = FALSE)
+replace_null_text_with_na <- function(x) {
+  if (is.character(x)) {
+    x[x == "NULL"] <- NA
+  }
+  return(x)
+}
+Directorio_Limpio <- data.frame(lapply(Directorio_Limpio, replace_null_text_with_na), stringsAsFactors = FALSE)
+```
+Se crean 4 bases (una por cada nivel de cargo)
+```{r}
+SegundoNivel<-Directorio_Limpio[,c(1:9)]
+colnames(SegundoNivel)<- c("Sectorista 2024", "Tipo municipalidad segun SC", "Sigla", "Entidad", "Nivel de gobierno", "Region", "Nombres", "Cargo", "Email")
+SegundoNivel <- SegundoNivel[!is.na(SegundoNivel$Email), ]
+TercerNivel<-Directorio_Limpio[,c(1:6,11:13)]
+colnames(TercerNivel)<- c("Sectorista 2024", "Tipo municipalidad segun SC", "Sigla", "Entidad", "Nivel de gobierno", "Region", "Nombres", "Cargo", "Email")
+TercerNivel <- TercerNivel[!is.na(TercerNivel$Email), ]
+GDC1<-Directorio_Limpio[,c(1:6,14:16)]
+colnames(GDC1)<- c("Sectorista 2024", "Tipo municipalidad segun SC", "Sigla", "Entidad", "Nivel de gobierno", "Region", "Nombres", "Cargo", "Email")
+GDC1 <- GDC1[!is.na(GDC1$Email), ]
+GDC2<-Directorio_Limpio[,c(1:6,19,21,20)]
+colnames(GDC2)<- c("Sectorista 2024", "Tipo municipalidad segun SC", "Sigla", "Entidad", "Nivel de gobierno", "Region", "Nombres", "Cargo", "Email")
+GDC2 <- GDC2[!is.na(GDC2$Email), ]
+```
+Se uniformizan y ordenan las 4 bases
+```{r}
+SegundoNivel$Email <- gsub("\\s+", " ", SegundoNivel$Email)
+SegundoNivel <- SegundoNivel %>%
+  separate_rows(Email, sep = ";| |,|/|:|  ")
+SegundoNivel <- SegundoNivel %>%
+  filter(Email != "")
+SegundoNivel <- SegundoNivel %>%
+  distinct(Email, Sigla, .keep_all = TRUE)  
+TercerNivel$Email <- gsub("\\s+", " ", TercerNivel$Email)
+TercerNivel <- TercerNivel %>%
+  separate_rows(Email, sep = ";| |,|/|:|  ")
+TercerNivel <- TercerNivel %>%
+  filter(Email != "")
+TercerNivel <- TercerNivel %>%
+  distinct(Email, Sigla, .keep_all = TRUE)  
+GDC1$Email <- gsub("\\s+", " ", GDC1$Email)
+  GDC1 <- GDC1 %>%
+separate_rows(Email, sep = ";| |,|/|:|  ")
+GDC1 <- GDC1 %>%
+  filter(Email != "")
+GDC1 <- GDC1 %>%
+  distinct(Email, Sigla, .keep_all = TRUE)  
+GDC2$Email <- gsub("\\s+", " ", GDC2$Email)
+GDC2 <- GDC2 %>%
+  separate_rows(Email, sep = ";| |,|/|:|  ")
+GDC2 <- GDC2 %>%
+  filter(Email != "")
+GDC2 <- GDC2 %>%
+  distinct(Email, Sigla, .keep_all = TRUE)
+```
+Se juntan las 4 bases en una
+```{r}
+BdD_Mailing <- bind_rows(SegundoNivel, TercerNivel, GDC1, GDC2)
+BdD_Mailing <- BdD_Mailing %>%
+  distinct(Email, Sigla, .keep_all = TRUE)  
+```
+Se uniformiza y ordena la base final
+```{r}
+BdD_Mailing <- BdD_Mailing %>%
+  arrange(Region, Sigla)
+BdD_Mailing <- BdD_Mailing %>%
+  mutate("N." = row_number())
+BdD_Mailing$N. <- as.character(BdD_Mailing$N.)
+BdD_Mailing <- BdD_Mailing %>%
+  rename(`N°` = `N.`)
+BdD_Mailing$"Apellido paterno" <- ""
+BdD_Mailing$"Apellido materno" <- ""
+BdD_Mailing$"Area" <- ""
+BdD_Mailing$"Tipo cargo" <- ""
+BdD_Mailing$Nombres <- rep("", nrow(BdD_Mailing))
+BdD_Mailing <- BdD_Mailing %>%
+  select(`N°`, `Sectorista 2024`, `Tipo municipalidad segun SC`, Sigla, Email, `Apellido paterno`, `Apellido materno`, Nombres, Region, Entidad, Area, Cargo, `Tipo cargo`, `Nivel de gobierno`)
+```
+Se exporta la base resultante a Google Sheets
+```{r}
+Exportar_URL <- "https://docs.google.com/spreadsheets/d/1EI" #Actualizar al URL de interés
+write_sheet(BdD_Mailing, Exportar_URL, sheet = "Resultado") #Actualizar a la nombre de hoja de interés (si es una nueva a crear, el nombre no debe coincidir con alguna preexistente)
+```
+
+    ANTES DE CORRER EL RESTO DE CÓDIGOS:
+
+Se abren todas las librerías a utilIzar (inclyendo el permiso a gmail)
+```{r}
+library(googlesheets4)
+library(stringr)
+library(dplyr)
+library(stringi)
+library(tidyverse)
+library(tidyr)
+gs4_auth()
+```
+Se instalan las librerías a utilizar
+```{r}
+install.packages("googlesheets4")
+install.packages("stringr")
+install.packages("dplyr")
+install.packages("stringi")
+install.packages("tidyverse")
+install.packages("tidyr")
+```
+
